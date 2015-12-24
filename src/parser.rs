@@ -155,13 +155,19 @@ impl<T: Iterator<Item=char>> Parser<T> {
         }
 
         match self.ch {
-            Some(ch) => {
-                if ch == '\n' {
-                    self.line += 1;
-                    self.col = 1;
-                } else {
-                    self.col += 1;
+            Some('\n') => {
+                self.line += 1;
+                self.col = 1;
+            }
+            Some('\r') => {
+                // Normalize CRLF to LF.
+                if self.peek() == Some('\n') {
+                    self.bump()
                 }
+                self.col += 1;
+            }
+            Some(_) => {
+                self.col += 1;
             }
             None => { }
         }
@@ -217,12 +223,6 @@ impl<T: Iterator<Item=char>> Parser<T> {
         match self.ch {
             Some('\n') => {
                 self.bump();
-            },
-            Some('\r') => {
-                if self.peek() == Some('\n') {
-                    self.bump();
-                    self.bump();
-                }
             },
             _ => {},
         }
@@ -934,6 +934,14 @@ mod tests {
     #[test]
     fn test_multiline_triquote_entity() {
         let p = Parser::new("<hello \"\"\"\n  Hello\"\", \n  \"World\n\"\"\">".chars());
+        assert_eq!(p.parse().unwrap(), vec![
+                             Entity(s("hello"), Str(s("Hello\"\", \n\"World")), vec![], vec![])
+        ]);
+    }
+
+    #[test]
+    fn test_normalize() {
+        let p = Parser::new("<hello \"\"\"\r\n  Hello\"\", \r\n  \"World\r\n\"\"\">".chars());
         assert_eq!(p.parse().unwrap(), vec![
                              Entity(s("hello"), Str(s("Hello\"\", \n\"World")), vec![], vec![])
         ]);

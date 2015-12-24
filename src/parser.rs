@@ -135,8 +135,8 @@ impl<T: Iterator<Item=char>> Parser<T> {
             reader: source,
             ch: None,
             lookahead: None,
-            line: 0,
-            col: 0,
+            line: 1, // Technically we'll always start from line 1
+            col: 0,  // .. but the line may be empty
         }
     }
 

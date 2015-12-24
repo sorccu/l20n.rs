@@ -209,6 +209,25 @@ impl<T: Iterator<Item=char>> Parser<T> {
                     self.ch_is('\r') { self.bump(); }
     }
 
+    fn parse_horizontal_whitespace(&mut self) {
+        while self.ch_is(' ') || self.ch_is('\t') { self.bump(); }
+    }
+
+    fn parse_crlf(&mut self) {
+        match self.ch {
+            Some('\n') => {
+                self.bump();
+            },
+            Some('\r') => {
+                if self.peek() == Some('\n') {
+                    self.bump();
+                    self.bump();
+                }
+            },
+            _ => {},
+        }
+    }
+
     fn parse_entry(&mut self) -> Result<Entry> {
         self.bump();
         let id = try!(self.parse_identifier());
@@ -344,9 +363,106 @@ impl<T: Iterator<Item=char>> Parser<T> {
 
     fn parse_value(&mut self) -> Result<Value> {
         match self.ch {
-            Some('"') | Some('\'') => self.parse_str(),
+            Some('"') | Some('\'') => self.parse_tristr_or_str(),
             Some('{') => self.parse_hash(),
             _ => Err(self.error(ValueError))
+        }
+    }
+
+    fn parse_tristr_or_str(&mut self) -> Result<Value> {
+        let quote = self.ch.unwrap();
+        if self.peek() == Some(quote) {
+            self.bump();
+            if self.peek() == Some(quote) {
+                self.bump();
+                self.parse_tristr()
+            } else {
+                Ok(Str("".to_string()))
+            }
+        } else {
+            self.parse_str()
+        }
+    }
+
+    fn parse_tristr(&mut self) -> Result<Value> {
+        let mut s = String::new();
+
+        let quote = self.ch.unwrap();
+        self.bump(); // Drop the identifying quote.
+
+        let mut exprs = vec![];
+
+        // If the quote is immediately followed by a newline, skip it and remove indentation.
+        self.parse_crlf();
+        self.parse_horizontal_whitespace();
+
+        loop {
+            match self.ch {
+                Some(c@'{') => {
+                    if self.peek() == Some('{') {
+                        self.bump();
+                        self.bump();
+                        self.parse_whitespace();
+                        let expr = try!(self.parse_expression());
+                        self.parse_whitespace();
+                        if self.ch_is('}') && self.peek() == Some('}') {
+                            self.bump();
+                            self.bump();
+                            exprs.push(ValExpr(Str(s)));
+                            exprs.push(expr);
+                            s = String::new();
+                        } else {
+                            return Err(self.error(ValueError));
+                        }
+                    } else {
+                        self.bump();
+                        s.push(c);
+                    }
+                },
+                Some('\\') => {
+                    self.bump();
+                },
+                Some(c@'\n') => {
+                    self.bump();
+                    s.push(c);
+                    self.parse_horizontal_whitespace();
+                },
+                Some(c) if c == quote => {
+                    // Drop the first quote.
+                    self.bump();
+
+                    // Check for 2nd quote.
+                    if self.ch_is(quote) {
+                        self.bump();
+
+                        // Check for finishing 3rd quote. If found, bump all and end loop.
+                        if self.ch_is(quote) {
+                            self.bump();
+                            break
+                        }
+
+                        // We had a 2nd quote but it didn't work out. Push it.
+                        s.push(quote);
+                    }
+
+                    // We had a 1st, possibly the only quote, and it didn't work out. Push it.
+                    s.push(quote);
+                },
+                Some(c) => {
+                    self.bump();
+                    s.push(c);
+                },
+                None => return Err(self.error(StrError))
+            }
+        }
+
+        if exprs.len() > 0 {
+            if s.len() > 0 {
+                exprs.push(ValExpr(Str(s.trim_right().into())));
+            }
+            Ok(ComplexStr(exprs))
+        } else {
+            Ok(Str(s.trim_right().into()))
         }
     }
 
@@ -804,6 +920,22 @@ mod tests {
         assert_eq!(p.parse().unwrap(), vec![
                              Entity(s("hell0"), Str(s("Hello, World")), vec![], vec![]),
                              Entity(s("bye"), Str(s("Bye!")), vec![], vec![])
+        ]);
+    }
+
+    #[test]
+    fn test_oneline_triquote_entity() {
+        let p = Parser::new(r#"<hello """Hello"", "World""" >"#.chars());
+        assert_eq!(p.parse().unwrap(), vec![
+                             Entity(s("hello"), Str(s(r#"Hello"", "World"#)), vec![], vec![])
+        ]);
+    }
+
+    #[test]
+    fn test_multiline_triquote_entity() {
+        let p = Parser::new("<hello \"\"\"\n  Hello\"\", \n  \"World\n\"\"\">".chars());
+        assert_eq!(p.parse().unwrap(), vec![
+                             Entity(s("hello"), Str(s("Hello\"\", \n\"World")), vec![], vec![])
         ]);
     }
 

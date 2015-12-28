@@ -3,6 +3,9 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use std::collections::HashMap;
+use std::error;
+use std::error::Error as _StdError;
+use std::fmt;
 
 pub type Result<T> = ::std::result::Result<T, ParseError>;
 
@@ -24,6 +27,32 @@ pub struct ParseError {
     pub line: usize,
     /// The column where the error occurred.
     pub col: usize,
+}
+
+impl error::Error for ParseError {
+    fn description(&self) -> &str {
+        match self.kind {
+            ParseErrorKind::IdentifierError => "Illegal syntax for an identifier",
+            ParseErrorKind::EntryError => "Illegal syntax for an entry",
+            ParseErrorKind::EntityError => "Illegal syntax for an entity",
+            ParseErrorKind::MacroError => "Illegal syntax for a macro",
+            ParseErrorKind::ExprError => "Illegal syntax for an expression",
+            ParseErrorKind::OpError => "Illegal syntax for an operator",
+            ParseErrorKind::ParenError => "Illegal syntax for an expression wrapped in parenthesis",
+            ParseErrorKind::AttrError => "Illegal syntax for an attribute",
+            ParseErrorKind::CallError => "Illegal syntax for a call expression (calling a macro)",
+            ParseErrorKind::ValueError => "Illegal syntax for a value, when a value was expected",
+            ParseErrorKind::VarError => "Illegal syntax for a variable",
+            ParseErrorKind::StrError => "Illegal syntax for a String",
+            ParseErrorKind::HashError => "Illegal syntax for a Hash",
+        }
+    }
+}
+
+impl fmt::Display for ParseError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{} on line {}, column {}", self.description(), self.line, self.col)
+    }
 }
 
 /// The description of the ParseError that occurred.

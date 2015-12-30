@@ -297,11 +297,11 @@ impl<T: Iterator<Item=char>> Parser<T> {
         }
         self.bump();
         self.parse_whitespace();
-        
+
         let body = try!(self.parse_expression());
 
         self.parse_whitespace();
-        
+
         if !self.ch_is('}') {
             return Err(self.error(MacroError));
         }
@@ -1064,4 +1064,3 @@ mod tests {
     }
 
 }
-

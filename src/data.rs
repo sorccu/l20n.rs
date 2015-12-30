@@ -175,4 +175,3 @@ impl serde::de::value::ValueDeserializer for Data {
         Decoder::new(self)
     }
 }
-

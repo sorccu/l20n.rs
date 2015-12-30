@@ -145,17 +145,19 @@ impl Locale {
         let mut map = HashMap::new();
         let ctx = ResolveContext::new(&self.resources, &data);
         for (id, entry) in &self.resources {
-            match entry {
-                &parser::Entity(..) => {
-                    map.insert(id.clone(), match entry.resolve_data(&ctx) {
-                        Ok(d) => d,
-                        Err(e) => return Err(ResolveError(e))
-                    });
+            // Only publish public entries. Entries that start with an underscore are helpers.
+            if !id.starts_with('_') {
+                match entry {
+                    &parser::Entity(..) => {
+                        map.insert(id.clone(), match entry.resolve_data(&ctx) {
+                            Ok(d) => d,
+                            Err(e) => return Err(ResolveError(e))
+                        });
+                    }
+                    _ => () // dont localize comments or macros
                 }
-                _ => () // dont localize comments or macros
             }
         }
-
         let mut dec = data::Decoder::new(data::Data::Map(map));
         match serde::Deserialize::deserialize(&mut dec) {
             Err(e) => Err(DecodeError(e)),

@@ -1,4 +1,7 @@
 use std::collections::HashMap;
+use std::error;
+use std::error::Error as _StdError;
+use std::fmt;
 
 use serde;
 
@@ -52,6 +55,22 @@ pub enum EncodeError {
     KeyIsNotString,
     /// A map element is missing.
     MissingElements,
+}
+
+impl error::Error for EncodeError {
+    fn description(&self) -> &str {
+        match *self {
+            EncodeError::UnsupportedType => "Type is not usable in L20n",
+            EncodeError::KeyIsNotString => "Maps in L20n require keys to be Strings",
+            EncodeError::MissingElements => "A map element is missing",
+        }
+    }
+}
+
+impl fmt::Display for EncodeError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.description())
+    }
 }
 
 pub type EncoderResult = Result<(), EncodeError>;

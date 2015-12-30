@@ -1,5 +1,8 @@
 
 use std::collections::HashMap;
+use std::error;
+use std::error::Error as _StdError;
+use std::fmt;
 
 use data;
 use parser::{ParseError, Parser};
@@ -131,6 +134,32 @@ pub enum ResolveError {
     /// A string tried to use another string in the l20n resource that did not
     /// exist.
     MissingIdent(String),
+}
+
+impl error::Error for ResolveError {
+    fn description(&self) -> &str {
+        match *self {
+            ResolveError::WrongType => "A resource received a value of the wrong type",
+            ResolveError::WrongNumberOfArgs => "A macro was called with the wrong number of arguments",
+            ResolveError::MissingIndex => "Accessed an index of a Hash that does not exist",
+            ResolveError::MissingAttr => "Accessed an attribute of an entity that does not exist",
+            ResolveError::MissingVar(_) => "Tried to use a variable that did not exist in the provided Data",
+            ResolveError::MissingIdent(_) => "A string tried to use another string in the l20n resource that did not exist",
+        }
+    }
+}
+
+impl fmt::Display for ResolveError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            ResolveError::WrongType => write!(f, "{}", self.description()),
+            ResolveError::WrongNumberOfArgs => write!(f, "{}", self.description()),
+            ResolveError::MissingIndex => write!(f, "{}", self.description()),
+            ResolveError::MissingAttr => write!(f, "{}", self.description()),
+            ResolveError::MissingVar(ref val) => write!(f, "{}: {}", self.description(), val),
+            ResolveError::MissingIdent(ref val) => write!(f, "{}: {}", self.description(), val),
+        }
+    }
 }
 
 /// Resolve an L20n resource into Data.

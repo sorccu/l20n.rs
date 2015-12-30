@@ -1,4 +1,7 @@
 use std::collections::HashMap;
+use std::error;
+use std::error::Error as _StdError;
+use std::fmt;
 
 use serde;
 
@@ -69,6 +72,34 @@ pub enum LocalizeError {
     EncodeError(data::EncodeError),
     /// Wraps a ResolveError.
     ResolveError(compiler::ResolveError)
+}
+
+impl error::Error for LocalizeError {
+    fn description(&self) -> &str {
+        match *self {
+            LocalizeError::DecodeError(_) => "Decode error",
+            LocalizeError::EncodeError(_) => "Encode error",
+            LocalizeError::ResolveError(_) => "Resolve error",
+        }
+    }
+
+    fn cause(&self) -> Option<&error::Error> {
+        match *self {
+            LocalizeError::DecodeError(_) => None, // @FIXME
+            LocalizeError::EncodeError(ref err) => Some(err),
+            LocalizeError::ResolveError(ref err) => Some(err),
+        }
+    }
+}
+
+impl fmt::Display for LocalizeError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            LocalizeError::DecodeError(_) => write!(f, "{}", self.description()), // @FIXME
+            LocalizeError::EncodeError(ref err) => write!(f, "{}: {}", self.description(), err),
+            LocalizeError::ResolveError(ref err) => write!(f, "{}: {}", self.description(), err),
+        }
+    }
 }
 
 /// A Result of trying to localize.
